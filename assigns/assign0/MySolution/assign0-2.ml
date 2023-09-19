@@ -1,3 +1,5 @@
+#use "./../assign0.ml";;
+
 let isPrime n0 =
   if n0 <= 1 then
     false
