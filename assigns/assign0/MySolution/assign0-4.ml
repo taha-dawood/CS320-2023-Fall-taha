@@ -1,10 +1,8 @@
 #use "./../assign0.ml";;
+#use "./../../../classlib/OCaml/MyOCaml.ml";;
 
 let isNeg (myStr: string): bool =
   if myStr.[0] = '-' then true else false
-;;
-
-(*************************************)
 
 let rec str2int(cs: string): int =
   let strLen = string_length cs in
@@ -15,4 +13,3 @@ let rec str2int(cs: string): int =
       let addTostring = string_init (strLen-1) (fun i -> string_get(cs, index + i)) in
       let newString = str2int(addTostring) in
       if isNeg(cs) then -(((10*newString) + ordVal)) else (10*newString) + ordVal
-  ;;
