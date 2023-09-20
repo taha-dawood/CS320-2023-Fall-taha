@@ -9,6 +9,9 @@ let count_digits d =
       count_helper (n / 10) (count + 1)
     in
     count_helper (abs d) 0 
+
+(* ****** ****** *)
+
   let int2str i0 = 
     let num_digits = count_digits i0 in 
     let result = string_init num_digits (fun i ->

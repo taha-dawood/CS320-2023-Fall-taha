@@ -3,6 +3,9 @@
 let rec getChar (myStr: string) (index: int): char =
   let myChar = myStr.[index] in myChar
 ;;
+
+(* ****** ****** *)
+
 let rec stringrev(cs: string): string =
   let strLen = string_length cs in
   if strLen = 0 then "" 

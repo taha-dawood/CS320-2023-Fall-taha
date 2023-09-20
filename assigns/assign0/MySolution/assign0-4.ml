@@ -3,7 +3,8 @@
 let isNeg (myStr: string): bool =
   if myStr.[0] = '-' then true else false
 ;;
-  (*************************************)
+
+(*************************************)
 
 let rec str2int(cs: string): int =
   let strLen = string_length cs in
