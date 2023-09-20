@@ -4,7 +4,7 @@
 
 let pp x y = fun f -> f(x,y)
 
-let ff x y = fun f -> f (x - y)(* WRITE YOUR CODE *)
+let ff = fun (x, y) -> x - y(* WRITE YOUR CODE *)
 
 (* Give an implementation of ff that
    makes the following assertions pass *)

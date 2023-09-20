@@ -11,11 +11,13 @@
 
 let isPrime(n) =
   let test(i:int): bool = (* YOUR ANSWER *)
-    if i <= 1 then true
-    else if n mod i = 0 then false
-    else test (i - 1)
+    if i <= 1 then 
+      true
+    else if n mod i = 0 then 
+      false
+    else 
+      true
   in
-  if n < 2 then false else test (int_of_float (sqrt (float_of_int n)))
-
+  if n < 2 then false else int1_forall(n)(test)
 
 (* ************************************************ *)
