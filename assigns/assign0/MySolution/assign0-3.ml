@@ -21,11 +21,12 @@
 
 let append (c0: char) (cs: string): string = 
   string_init (string_length cs + 1) (fun i ->
-    if i = 0 then c0 else string_get(cs, i - 1))
+    if i = 0 then c0 else string_get(cs, i - 1)
+  )
 
 let rec num2str2 (i: int) (s: string): string = 
   if i < 10 then 
-    append (chr (ord '0' + i)) 
+    append (chr (ord '0' + i)) s
   else
     let n0 = i mod 10 in
     let rest_int = i / 10 in
