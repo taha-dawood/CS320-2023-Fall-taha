@@ -15,11 +15,5 @@ let rec merge_sorted_strings cs1 cs2 =
       string_cons char2 (merge_sorted_strings cs1 (string_tail cs2))
 ;;
 
-let string_merge cs1 cs2 =
-  let merged = merge_sorted_strings cs1 cs2 in 
-  let filtered = string_filter merged (fun c -> true) in 
-  string_concat_list [filtered]
-;;
-
 
 
