@@ -1,23 +1,48 @@
 #use "./../../../classlib/OCaml/MyOcaml.ml";; 
 
-let string_merge(cs1: string) (cs2: string): string =
-  let result = string_make_fwork (fun add_char ->
-    let rec merge_strings s1 s2 =
-      match (s1, s2) with
-      | ("", "") -> ()
-      | ("", s) -> String.iter add_char s
-      | (s, "") -> String.iter add_char s
-      | (c1::rest1, c2::rest2) ->
-          if Char.code c1 <= Char.code c2 then (
-            add_char c1;
-            merge_strings rest1 s2
-          ) else (
-            add_char c2;
-            merge_strings s1 rest2
-          )
+(*let string_longest_ascend xs =
+  let len = String.length xs in
+  if len = 0 then
+    ""
+  else
+    let rec find_longest i current longest =
+      if i = len then
+        if String.length current > String.length longest then
+          current
+        else
+          longest
+      else if xs.[i] >= xs.[i - 1] then
+        find_longest (i + 1) (current ^ Char.escaped xs.[i]) longest
+      else
+        let new_longest =
+          if String.length current > String.length longest then
+            current
+          else
+            longest
+        in
+        find_longest (i + 1) (Char.escaped xs.[i]) new_longest
     in
-    merge_strings (String.to_list cs1) (String.to_list cs2)
-  )
-  in
-  result
+    find_longest 1 (Char.escaped xs.[0]) ""*)
+
+let rec merge_sorted_strings cs1 cs2 =
+   match cs1, cs2 with
+   | "", "" -> ""
+   | "", cs2' -> cs2'
+   | cs1', "" -> cs1'
+   | _ ->
+    let char1 = string_head cs1 in 
+    let char2 = string_head cs2 in
+    if char1 <= char2 then
+      string_cons char1 (merge_sorted_strings (string_tail cs1) cs2)
+    else
+      string_cons char2 (merge_sorted_strings cs1 (string_tail cs2))
 ;;
+
+let string_merge cs1 cs2 =
+  let merged = merge_sorted_strings cs1 cs2 in 
+  let filtered = string_filter merged (fun c -> true) in 
+  string_concat_list [filtered]
+;;
+
+
+
