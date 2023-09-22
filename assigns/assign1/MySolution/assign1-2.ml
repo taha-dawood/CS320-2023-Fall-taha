@@ -1,30 +1,6 @@
 #use "./../assign1-1.ml";;
 #use "./../../../classlib/OCaml/MyOcaml.ml";; 
 
-(*let string_longest_ascend xs =
-  let len = String.length xs in
-  if len = 0 then
-    ""
-  else
-    let rec find_longest i current longest =
-      if i = len then
-        if String.length current > String.length longest then
-          current
-        else
-          longest
-      else if xs.[i] >= xs.[i - 1] then
-        find_longest (i + 1) (current ^ Char.escaped xs.[i]) longest
-      else
-        let new_longest =
-          if String.length current > String.length longest then
-            current
-          else
-            longest
-        in
-        find_longest (i + 1) (Char.escaped xs.[i]) new_longest
-    in
-    find_longest 1 (Char.escaped xs.[0]) ""*)
-
 let rec merge_sorted_strings cs1 cs2 =
    match cs1, cs2 with
    | "", "" -> ""
