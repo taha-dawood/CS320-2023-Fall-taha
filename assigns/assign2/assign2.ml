@@ -3,7 +3,10 @@
 //
 Assign2: datatypes and more loops
 //
-Total:
+DUE: the 27th of September, 2023
+//
+Total: 80 point
+(OCaml: 40 points)(Python: 40 points)
 //
 Except for the basic arithmetic functions
 (including those on chars), you may only use
@@ -73,6 +76,10 @@ let rec
 mylist_length(xs: 'a mylist): int = ...
 //
 *)
+(*
+let mylist_length =
+fun xs -> foreach_to_length(mylist_foreach)
+*)
 
 (* ****** ****** *)
 let
@@ -96,7 +103,21 @@ let rec
 mylist_get_at(xs: 'a mylist)(i0: int): 'a = ...
 //
 *)
-
+(*
+let mylist_get_at =
+fun xs -> foreach_to_get_at(mylist_foreach)
+*)
+(* ****** ****** *)
+(*
+let
+foreach_to_map_list
+( foreach
+: ('xs, 'x0) foreach): ('xs, 'x0, 'y0) map_list =
+fun xs fopr ->
+list_make_fwork
+(fun work -> foreach(xs)(fun x -> work(fopr(x))))
+;;
+*)
 (* ****** ****** *)
 
 type
@@ -147,9 +168,11 @@ string_sepjoin_list
 (sep: string)(xs: string list): string = ...
 
 For instance,
-string_sepjoin_list(",")(["1","22","333"]) = "1,22,333"
+string_sepjoin_list("")(["1";"22";"333"]) = "122333"
 For instance,
-string_sepjoin_list(";;")(["11","22","33"]) = "11;;22;;33"
+string_sepjoin_list(",")(["1";"22";"333"]) = "1,22,333"
+For instance,
+string_sepjoin_list(";;")(["11";"22";"33"]) = "11;;22;;33"
 *)
 
 (* ****** ****** *)

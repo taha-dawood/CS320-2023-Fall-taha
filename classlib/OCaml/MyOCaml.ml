@@ -238,13 +238,15 @@ let foreach_to_foldleft(foreach: ('xs, 'x0) foreach): 'xs -> 'r0 -> ('r0 -> 'x0 
 ;;(* end of [foreach_to_foldleft]: let *)
 
 (** **)
-let rec foreach_to_map_list(foreach: ('xs, 'x0) foreach): ('xs, 'x0, 'y0) map_list =
-  fun(xs)(fopr) -> list_reverse(foreach_to_map_rlist(foreach)(xs)(fopr)) 
-  and 
-  foreach_to_map_rlist(foreach: ('xs, 'x0) foreach): ('xs, 'x0, 'y0) map_rlist =
-    fun(xs)(fopr) -> 
-      let res = ref([]) in
-        foreach(xs)(fun(x0) -> res := fopr(x0) :: !res); !res
+let rec
+foreach_to_map_list(foreach: ('xs, 'x0) foreach): ('xs, 'x0, 'y0) map_list =
+fun(xs)(fopr) ->
+list_reverse(foreach_to_map_rlist(foreach)(xs)(fopr)) 
+and 
+foreach_to_map_rlist(foreach: ('xs, 'x0) foreach): ('xs, 'x0, 'y0) map_rlist =
+fun(xs)(fopr) -> 
+let res = ref([]) in
+foreach(xs)(fun(x0) -> res := fopr(x0) :: !res); !res
 ;;(* end of [foreach_to_map_rlist]: let *)
 
 (** **)
@@ -439,6 +441,57 @@ let string_concat_list(css: string list): string =
     fun work -> list_foreach css (fun cs -> string_foreach cs work)
   )
 ;;
+
+(* ****** ****** *)
+
+type 'a strcon =
+  StrNil
+| StrCons of
+  'a * (unit -> 'a strcon)
+
+(* ****** ****** *)
+
+type 'a stream =
+unit -> 'a strcon (* thunk *)
+
+(* ****** ****** *)
+
+let rec
+stream_map
+(fxs: 'a stream)
+(fopr: 'a -> 'b): 'b stream =
+fun () ->
+match fxs() with
+|
+StrNil -> StrNil
+|
+StrCons(x1, fxs) ->
+StrCons
+(fopr(x1), stream_map(fxs)(fopr))
+;;
+(* ****** ****** *)
+
+let rec
+stream_foreach
+(fxs: 'a stream)
+(work: 'a -> unit): unit =
+match fxs() with
+| StrNil -> ()
+| StrCons(x1, fxs) ->
+  (work(x1); stream_foreach(fxs)(work))
+;;
+(* ****** ****** *)
+
+let
+int1_map_stream
+(n0: int)
+(fopr: int -> 'a): 'a stream =
+let rec
+helper(i: int) =
+fun () ->
+if i >= n0
+then StrNil(*void*)
+else StrCons(fopr(i), helper(i+1)) in helper(0)
 
 (* ****** ****** *)
 
