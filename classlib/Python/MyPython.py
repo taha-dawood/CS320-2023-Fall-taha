@@ -110,4 +110,131 @@ def fnlist_reverse(xs):
     return res
 ####################################################
 
+def foreach_to_get_at(foreach):
+    res = [None]
+    class FoundExn(Exception):
+        pass
+    def get_at(xs, i0):
+        i1 = 0
+        def work_func(x0):
+            nonlocal i1
+            if i1 != i0:
+                i1 += 1
+            else:
+                res[0] = x0
+                raise FoundExn
+        try:
+            if i0 < 0:
+                raise IndexError
+            else:
+                foreach(xs, work_func)
+        except FoundExn:
+            return res[0]
+    return get_at # foreach-function is turned into get_at-function
+
+####################################################
+
+def foreach_to_iforall(foreach):
+    class FalseExn(Exception):
+        pass
+    def iforall(xs, itest_func):
+        i0 = 0
+        def work_func(x0):
+            nonlocal i0
+            if itest_func(i0, x0):
+                i0 = i0 + 1
+                return None
+            else:
+                raise FalseExn
+        try:
+            foreach(xs, work_func)
+            return True
+        except FalseExn:
+            return False
+    return iforall # foreach-function is turned into forall-function
+
+####################################################
+#
+# HX-2023-10-06: Lazy-evaluation and streams
+#
+###########################################################################
+
+class strcon:
+    ctag = -1
+    def get_ctag(self):
+        return self.ctag
+# end-of-class(strcon)
+
+class strcon_nil(strcon):
+    def __init__(self):
+        self.ctag = 0
+        return None
+# end-of-class(strcon_nil)
+
+class strcon_cons(strcon):
+    def __init__(self, cons1, cons2):
+        self.ctag = 1
+        self.cons1 = cons1
+        self.cons2 = cons2
+        return None
+    def get_cons1(self):
+        return self.cons1
+    def get_cons2(self):
+        return self.cons2
+# end-of-class(strcon_cons)
+
+###########################################################################
+
+def stream_foreach(fxs, work):
+    while(True):
+        cxs = fxs()
+        if (cxs.ctag == 0):
+            break
+        else:
+            work(cxs.cons1)
+            fxs = cxs.cons2
+        # end-of-(if(cxs.ctag==0)-then-else)
+    return None # end-of-(stream_foreach)
+
+def stream_get_at(fxs, i0):
+    while(True):
+        cxs = fxs()
+        if (cxs.ctag == 0):
+            raise IndexError
+        else:
+            if i0 <= 0:
+                return cxs.cons1
+            else:
+                i0 = i0 - 1
+                fxs = cxs.cons2
+    return None # This is deadcode
+
+###########################################################################
+
+def stream_tabulate(n0, fopr):
+    def helper1(i0):
+        return strcon_cons(fopr(i0), lambda: helper1(i0+1))
+    def helper2(i0):
+        if i0 >= n0:
+            return strcon_nil()
+        else:
+            return strcon_cons(fopr(i0), lambda: helper2(i0+1))
+        # end-of-(if(i0 >= n0)-then-else)
+    if n0 < 0:
+        return lambda: helper1(0)
+    else:
+        return lambda: helper2(0)
+    # end-of-(if(n0 < 0)-then-else)
+    
+###########################################################################
+
+def string_streamize(xs):
+    return stream_tabulate(len(xs), lambda i0: xs[i0])
+def pylist_streamize(xs):
+    return stream_tabulate(len(xs), lambda i0: xs[i0])
+def pytuple_streamize(xs):
+    return stream_tabulate(len(xs), lambda i0: xs[i0])
+
+###########################################################################
+
 ############### end of [CS320-2023-Fall-classlib-MyPython.py] ###############
