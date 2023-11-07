@@ -46,70 +46,77 @@ let rec trim cs =
    parse "((mul 1 2)" = None
 
 *)
-type token =
-  | TokInt of int
-  | TokAdd
-  | TokMul
-  | TokLParen
-  | TokRParen
-  | TokEnd
 
-let is_digit c = c >= '0' && c <= '9'
-
-(* Convert a list of chars into a list of tokens *)
-let rec tokenize = function
-  | [] -> [TokEnd]
-  | ' ' :: cs | '\n' :: cs | '\t' :: cs | '\r' :: cs -> tokenize (trim cs)
-  | '(' :: cs -> TokLParen :: tokenize (trim cs)
-  | ')' :: cs -> TokRParen :: tokenize (trim cs)
-  | c :: cs when is_digit c ->
-      let (num, rest) = span is_digit (c :: cs) in
-      TokInt (int_of_string (implode num)) :: tokenize (trim rest)
-  | 'a' :: 'd' :: 'd' :: cs -> TokAdd :: tokenize (trim cs)
-  | 'm' :: 'u' :: 'l' :: cs -> TokMul :: tokenize (trim cs)
-  | _ -> []  (* Invalid character found, so we return an empty list to indicate an error *)
-
-and span p cs =
-  let rec span' p (acc, cs) =
-    match cs with
-    | c :: cs when p c -> span' p (c :: acc, cs)
-    | _ -> (acc, cs)
-  in span' p ([], cs)
-
-and implode cs = 
-  let str = String.create (List.length cs) in
-  let rec imp i = function
-  | [] -> str
-  | c :: cs -> str.[i] <- c; imp (i + 1) cs in
-  imp 0 (List.rev cs)
-
-  let rec parse_expr = function
-  | TokInt n :: tokens -> (Int n, tokens)
-  | TokLParen :: TokAdd :: tokens -> parse_add tokens
-  | TokLParen :: TokMul :: tokens -> parse_mul tokens
-  | _ -> raise (Failure "parse error")
-
-and parse_add tokens =
-  let rec parse_args acc tokens =
-    match tokens with
-    | TokRParen :: rest -> (Add (List.rev acc), rest)
-    | _ ->
-        let (expr, tokens') = parse_expr tokens in
-        parse_args (expr :: acc) tokens'
-  in
-  parse_args [] tokens
-
-and parse_mul tokens =
-  let rec parse_args acc tokens =
-    match tokens with
-    | TokRParen :: rest -> (Mul (List.rev acc), rest)
-    | _ ->
-        let (expr, tokens') = parse_expr tokens in
-        parse_args (expr :: acc) tokens'
-  in
-  parse_args [] tokens
-
-let parse (s : string) : expr option = 
-  let tokens = tokenize (string_listize s) in
-  try Some (fst (parse_expr tokens))
-  with Failure _ -> None
+let is_digit (c : char) : bool =
+    match Char.code c with
+    | 48 (* ASCII code for '0' *) 
+    | 49 (* ASCII code for '1' *)
+    | 50 (* ASCII code for '2' *)
+    | 51 (* ASCII code for '3' *)
+    | 52 (* ASCII code for '4' *)
+    | 53 (* ASCII code for '5' *)
+    | 54 (* ASCII code for '6' *)
+    | 55 (* ASCII code for '7' *)
+    | 56 (* ASCII code for '8' *)
+    | 57 (* ASCII code for '9' *) -> true
+    | _ -> false
+    
+let parse (s : string) : expr option =
+    let rec parse_num (cs : char list) : expr option * char list =
+      match cs with
+      | [] -> None, cs
+      | ' ' :: rest -> parse_num (trim rest)
+      | c :: rest when is_digit c ->
+        let num, rest' = parse_num_helper cs in
+        Some (Int num), rest'
+      | _ -> None, cs
+    and parse_num_helper (cs : char list) : int * char list =
+      let rec aux (cs : char list) (acc : string) : int * char list =
+        match cs with
+        | [] -> int_of_string acc, []
+        | c :: rest when is_digit c -> aux rest (acc ^ Char.escaped c)
+        | _ -> int_of_string acc, cs
+      in
+      aux cs ""
+    and parse_add (cs : char list) : expr option * char list =
+      match cs with
+      | [] -> None, cs
+      | '(' :: 'a' :: 'd' :: 'd' :: ' ' :: rest ->
+        let exprs, rest' = parse_exprs rest in
+        (match exprs with
+         | Some args -> Some (Add args), rest'
+         | None -> None, cs)
+      | _ -> None, cs
+    and parse_mul (cs : char list) : expr option * char list =
+      match cs with
+      | [] -> None, cs
+      | '(' :: 'm' :: 'u' :: 'l' :: ' ' :: rest ->
+        let exprs, rest' = parse_exprs rest in
+        (match exprs with
+         | Some args -> Some (Mul args), rest'
+         | None -> None, cs)
+      | _ -> None, cs
+    and parse_exprs (cs : char list) : expr list option * char list =
+      let rec aux (cs : char list) (acc : expr list) : expr list option * char list =
+        match cs with
+        | [] -> Some (List.rev acc), cs
+        | ')' :: rest -> Some (List.rev acc), rest
+        | _ ->
+          let expr, rest' = parse_expr cs in
+          (match expr with
+           | Some e -> aux rest' (e :: acc)
+           | None -> None, cs)
+      in
+      aux cs []
+    and parse_expr (cs : char list) : expr option * char list =
+      match cs with
+      | [] -> None, cs
+      | '(' :: 'a' :: 'd' :: 'd' :: ' ' :: _ -> parse_add cs
+      | '(' :: 'm' :: 'u' :: 'l' :: ' ' :: _ -> parse_mul cs
+      | _ -> parse_num cs
+    in
+  
+    let char_list = string_listize s in
+    match parse_expr (trim char_list) with
+    | Some e, [] -> Some e
+    | _ -> None
