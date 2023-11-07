@@ -61,62 +61,60 @@ let is_digit (c : char) : bool =
     | 57 (* ASCII code for '9' *) -> true
     | _ -> false
     
-let parse (s : string) : expr option =
-    let rec parse_num (cs : char list) : expr option * char list =
-      match cs with
-      | [] -> None, cs
-      | ' ' :: rest -> parse_num (trim rest)
-      | c :: rest when is_digit c ->
-        let num, rest' = parse_num_helper cs in
-        Some (Int num), rest'
-      | _ -> None, cs
-    and parse_num_helper (cs : char list) : int * char list =
-      let rec aux (cs : char list) (acc : string) : int * char list =
+    let parse (s : string) : expr option =
+      let rec parse_num (cs : char list) : (expr option * char list) =
         match cs with
-        | [] -> int_of_string acc, []
-        | c :: rest when is_digit c -> aux rest (acc ^ Char.escaped c)
-        | _ -> int_of_string acc, cs
-      in
-      aux cs ""
-    and parse_add (cs : char list) : expr option * char list =
-      match cs with
-      | [] -> None, cs
-      | '(' :: 'a' :: 'd' :: 'd' :: ' ' :: rest ->
-        let exprs, rest' = parse_exprs rest in
-        (match exprs with
-         | Some args -> Some (Add args), rest'
-         | None -> None, cs)
-      | _ -> None, cs
-    and parse_mul (cs : char list) : expr option * char list =
-      match cs with
-      | [] -> None, cs
-      | '(' :: 'm' :: 'u' :: 'l' :: ' ' :: rest ->
-        let exprs, rest' = parse_exprs rest in
-        (match exprs with
-         | Some args -> Some (Mul args), rest'
-         | None -> None, cs)
-      | _ -> None, cs
-    and parse_exprs (cs : char list) : expr list option * char list =
-      let rec aux (cs : char list) (acc : expr list) : expr list option * char list =
+        | [] -> (None, cs)
+        | ' ' :: rest -> parse_num (trim rest)
+        | c :: rest when is_digit c ->
+          let (num, rest') = parse_num_helper cs in
+          (Some (Int num), rest')
+        | _ -> (None, cs)
+      and parse_num_helper (cs : char list) : (int * char list) =
+        let rec aux (cs : char list) (acc : string) : (int * char list) =
+          match cs with
+          | c :: rest when is_digit c -> aux rest (acc ^ Char.escaped c)
+          | _ -> (int_of_string acc, cs)
+        in
+        aux cs ""
+      and parse_add (cs : char list) : (expr option * char list) =
         match cs with
-        | [] -> Some (List.rev acc), cs
-        | ')' :: rest -> Some (List.rev acc), rest
-        | _ ->
-          let expr, rest' = parse_expr cs in
-          (match expr with
-           | Some e -> aux rest' (e :: acc)
-           | None -> None, cs)
+        | '(' :: 'a' :: 'd' :: 'd' :: rest ->
+          let (exprs, rest') = parse_exprs (trim rest) in
+          (match exprs with
+           | Some args -> (Some (Add args), rest')
+           | None -> (None, cs))
+        | _ -> (None, cs)
+      and parse_mul (cs : char list) : (expr option * char list) =
+        match cs with
+        | '(' :: 'm' :: 'u' :: 'l' :: rest ->
+          let (exprs, rest') = parse_exprs (trim rest) in
+          (match exprs with
+           | Some args -> (Some (Mul args), rest')
+           | None -> (None, cs))
+        | _ -> (None, cs)
+      and parse_exprs (cs : char list) : (expr list option * char list) =
+        let rec aux (cs : char list) (acc : expr list) : (expr list option * char list) =
+          match cs with
+          | ')' :: rest -> (Some (List.rev acc), rest)
+          | ' ' :: rest -> aux (trim rest) acc  (* Trim spaces before parsing the next expression *)
+          | _ ->
+            let (expr, rest') = parse_expr cs in
+            (match expr with
+             | Some e -> aux (trim rest') (e :: acc)  (* Trim spaces after an expression has been parsed *)
+             | None -> (None, cs))
+        in
+        aux cs []
+      and parse_expr (cs : char list) : (expr option * char list) =
+        let trimmed_cs = trim cs in  (* Trim before deciding which rule to apply *)
+        match trimmed_cs with
+        | '(' :: 'a' :: 'd' :: 'd' :: _ -> parse_add trimmed_cs
+        | '(' :: 'm' :: 'u' :: 'l' :: _ -> parse_mul trimmed_cs
+        | _ -> parse_num trimmed_cs
       in
-      aux cs []
-    and parse_expr (cs : char list) : expr option * char list =
-      match cs with
-      | [] -> None, cs
-      | '(' :: 'a' :: 'd' :: 'd' :: ' ' :: _ -> parse_add cs
-      | '(' :: 'm' :: 'u' :: 'l' :: ' ' :: _ -> parse_mul cs
-      | _ -> parse_num cs
-    in
-  
-    let char_list = string_listize s in
-    match parse_expr (trim char_list) with
-    | Some e, [] -> Some e
-    | _ -> None
+    
+      let char_list = string_listize s in
+      let (result, remaining) = parse_expr (trim char_list) in
+      match result, remaining with
+      | Some e, [] -> Some e  (* Make sure there are no remaining characters after parsing *)
+      | _ -> None
