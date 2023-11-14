@@ -59,11 +59,20 @@ type sexpr =
   | SMul of sexpr list (* (mul e1 e2 ...) *)
 
 (* ****** ****** *)
-let rec sexpr_to_string (e : sexpr)  : string = 
-  match e with
-  | SInt n -> string_of_int n
-  | SAdd es -> "(add " ^ String.concat " " (List.map sexpr_to_string es) ^ ")"
-  | SMul es -> "(mul " ^ String.concat " " (List.map sexpr_to_string es) ^ ")"
+type sexpr_action =
+  | ProcessSexpr of sexpr
+  | AppendString of string
+
+let sexpr_to_string (e : sexpr) : string =
+  let rec process_stack stack acc =
+    match stack with
+    | [] -> acc
+    | ProcessSexpr (SInt n) :: t -> process_stack t (acc ^ string_of_int n)
+    | ProcessSexpr (SAdd es) :: t -> process_stack (AppendString "(" :: AppendString "add " :: List.rev_append (List.map (fun e -> ProcessSexpr e) es) (AppendString ")" :: t)) acc
+    | ProcessSexpr (SMul es) :: t -> process_stack (AppendString "(" :: AppendString "mul " :: List.rev_append (List.map (fun e -> ProcessSexpr e) es) (AppendString ")" :: t)) acc
+    | AppendString s :: t -> process_stack t (acc ^ s)
+  in
+  process_stack [ProcessSexpr e] ""
 
 (* end of [CS320-2023-Fall-assigns-assign6.ml] *)
 let rec sexpr_parser () =
