@@ -1,92 +1,39 @@
 #use "./../../../../classlib/OCaml/MyOCaml.ml";;
-(* ****** ****** *)
-(*
-//
-Assign6:
-Parsing and parsing combinators
-//
-DUE: the 13th of November, 2023
-//
-Except for the basic arithmetic functions
-(including those on chars), you may only use
-the functions in classlib/OCaml/MyOCaml.ml
-//
-*)
-(* ****** ****** *)
 
-(*
-//
-Assign6-1:
-//
-Please implement a print and parse function. Using parser combinators. When
-given a valid string according to the grammar, your parse function returns an
-sexpr value encoding the expression.
-
-//
-let sexpr_to_string (e : sexpr)  : string       = ...
-let sexpr_parse     (s : string) : sexpr option = ...
-//
-
-Example (Accepted Strings):
-sexpr_parse "(add 1 2 3)" = Some (SAdd [SInt 1; SInt 2; Int 3])
-sexpr_parse "(mul (add 1 2) 3 (mul 1))" = Some (SMul [SAdd [SInt 1; SInt 2]; SInt 3; SMul [SInt 1]])
-//
-Example (Rejected Strings):
-sexpr_parse "()" = None
-sexpr_parse "(add)" = None
-sexpr_parse "(add 1 2))" = None
-sexpr_parse "((mul 1 2)" = None
-//
-*)
-
-(* ****** ****** *)
-
-(*
-
-Grammar (<expr> is the start symbol)
-
-<digit> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-<num>   ::= <digit> | <digit><num>
-<exprs> ::= <expr> | <expr> <exprs>
-<expr>  ::= <num>
-          | (add <exprs> )
-          | (mul <exprs> )
-*)
-
+(* Define sexpr type *)
 type sexpr =
   | SInt of int        (* 1, 2, 3, 4 ...  *)
   | SAdd of sexpr list (* (add e1 e2 ...) *)
   | SMul of sexpr list (* (mul e1 e2 ...) *)
 
-(* ****** ****** *)
-type sexpr_action =
-  | ProcessSexpr of sexpr
-  | AppendString of string
+(* Define parsers *)
+let rec parse_sexpr () : sexpr parser =
+  parse_Sint () <|> parse_Add () <|> parse_Mul ()
 
-let sexpr_to_string (e : sexpr) : string =
-  let rec process_stack stack acc =
-    match stack with
-    | [] -> acc
-    | ProcessSexpr (SInt n) :: t -> process_stack t (acc ^ string_of_int n)
-    | ProcessSexpr (SAdd es) :: t -> process_stack (AppendString "(" :: AppendString "add " :: List.rev_append (List.map (fun e -> ProcessSexpr e) es) (AppendString ")" :: t)) acc
-    | ProcessSexpr (SMul es) :: t -> process_stack (AppendString "(" :: AppendString "mul " :: List.rev_append (List.map (fun e -> ProcessSexpr e) es) (AppendString ")" :: t)) acc
-    | AppendString s :: t -> process_stack t (acc ^ s)
-  in
-  process_stack [ProcessSexpr e] ""
+and parse_Sint () : sexpr parser =
+  let* n = digit >>= fun d -> pure (int_of_string (String.make 1 d)) in
+  pure (SInt n) << whitespaces
 
-(* end of [CS320-2023-Fall-assigns-assign6.ml] *)
-let rec sexpr_parser () =
-  disj
-    (map natural (fun n -> SInt n))
-    (disj
-      (seqleft (keyword "(")
-        (seqleft (keyword "add")
-          (seqright (many' sexpr_parser)
-            (seqleft (keyword ")") (pure SAdd)))))
-      (seqleft (keyword "(")
-        (seqleft (keyword "mul")
-          (seqright (many' sexpr_parser)
-            (seqleft (keyword ")") (pure SMul))))))
+and parse_Add () : sexpr parser =
+  let* _ = keyword "(add" in
+  let* es = many1' parse_sexpr in
+  let* _ = keyword ")" in
+  pure (SAdd es)
+
+and parse_Mul () : sexpr parser =
+  let* _ = keyword "(mul" in
+  let* es = many1' parse_sexpr in
+  let* _ = keyword ")" in
+  pure (SMul es)
+
 let sexpr_parse (s : string) : sexpr option =
-  let@ (expr, _) = string_parse (sexpr_parser ()) s in
-  Some expr
+  match string_parse (parse_sexpr ()) s with
+  | Some (e, []) -> Some e
+  | _ -> None
+
+(* Define print function *)
+let rec sexpr_to_string (c: sexpr) : string =
+  match c with
+  | SInt d -> string_of_int d
+  | SAdd hs -> "(add " ^ (String.concat " " (List.map sexpr_to_string hs)) ^ ")"
+  | SMul hs -> "(mul " ^ (String.concat " " (List.map sexpr_to_string hs)) ^ ")"
