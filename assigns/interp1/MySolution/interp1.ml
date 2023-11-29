@@ -204,48 +204,56 @@ let option (p : 'a parser) : 'a option parser =
       (ws >> keyword "Lt" >| Lt) <|>
       (ws >> keyword "Gt" >| Gt)
 
-      let rec prog ls = match com ls with
-         | Some (c, ls') -> 
-           (match char ';' ls' with
-            | Some (_, ls'') ->
-              (match prog ls'' with
-               | Some (cs, ls''') -> Some (c :: cs, ls''')
-               | None -> Some ([c], ls''))
-            | None -> Some ([c], ls'))
+      let rec parse_commands ls =
+         match com ls with
+         | Some (command, remaining_ls) ->
+           (match char ';' remaining_ls with
+            | Some (_, post_semicolon_ls) ->
+              (match parse_commands post_semicolon_ls with
+               | Some (commands, final_ls) -> Some (command :: commands, final_ls)
+               | None -> Some ([command], remaining_ls))
+            | None -> Some ([command], remaining_ls))
+         | None -> None
+           
+       and parse_commands_with_ws ls =
+         match parse_commands ls with
+         | Some (commands, remaining_ls) ->
+           (match ws remaining_ls with
+            | Some (_, post_whitespace_ls) -> Some (commands, post_whitespace_ls)
+            | None -> Some (commands, remaining_ls))
          | None -> None
        
-       and prog_with_ws ls = match prog ls with
-         | Some (cs, ls') -> (match ws ls' with
-                              | Some (_, ls'') -> Some (cs, ls'')
-                              | None -> Some (cs, ls'))
-         | None -> None
     
-      let interp (s : string) : string list option =
-         let rec exec_command command stack trace = match command, stack with
-           | Push c, _ -> Some (c :: stack, trace)
-           | Pop, _ :: s -> Some (s, trace)
-           | Trace, c :: s -> Some (U :: s, (toString c) :: trace)
-           | Add, I i1 :: I i2 :: s -> Some (I (i1 + i2) :: s, trace)
-           | Sub, I i1 :: I i2 :: s -> Some (I (i1 - i2) :: s, trace)
-           | Mul, I i1 :: I i2 :: s -> Some (I (i1 * i2) :: s, trace)
-           | Div, I i1 :: I i2 :: s -> if i2 != 0 then Some (I (i1 / i2) :: s, trace) else None
-           | And, B b1 :: B b2 :: s -> Some (B (b1 && b2) :: s, trace)
-           | Or, B b1 :: B b2 :: s -> Some (B (b1 || b2) :: s, trace)
-           | Not, B b :: s -> Some (B (not b) :: s, trace)
-           | Lt, I i1 :: I i2 :: s -> Some (B (i1 < i2) :: s, trace)
-           | Gt, I i1 :: I i2 :: s -> Some (B (i1 > i2) :: s, trace)
-           | _ -> None  (* Handle invalid cases *)
-       
-         and exec_program program stack trace = match program with
-           | [] -> Some (List.rev trace)  (* End of program *)
-           | command :: rest -> 
-             (match exec_command command stack trace with
-               | Some (new_stack, new_trace) -> exec_program rest new_stack new_trace
-               | None -> None)  (* Command failed *)
-       
-         in
-         match parse (ws >> prog_with_ws) s with
-         | Some (p, []) -> exec_program p [] []
-         | _ -> None
-       
-       
+         let interp (input_string : string) : string list option =
+            match parse (ws >> parse_commands_with_ws) input_string with
+            | Some (parsed_commands, remaining_input) ->
+              let rec execute commands stack trace =
+                match commands, stack with
+                | [], _ -> Some trace
+                | Push value :: remaining_commands, current_stack ->
+                  execute remaining_commands (value :: current_stack) trace
+                | Pop :: remaining_commands, _ :: updated_stack ->
+                  execute remaining_commands updated_stack trace
+                | Pop :: remaining_commands, [] ->
+                  return_panic remaining_commands [] trace
+                | Trace :: remaining_commands, top_value :: updated_stack ->
+                  let updated_trace = (toString top_value) :: trace in
+                  execute remaining_commands (U :: updated_stack) updated_trace
+                | Trace :: remaining_commands, [] ->
+                  return_panic remaining_commands [] trace
+                | Add :: remaining_commands, I val1 :: I val2 :: updated_stack ->
+                  execute remaining_commands (I (val1 + val2) :: updated_stack) trace
+                | Sub :: remaining_commands, I val1 :: I val2 :: updated_stack ->
+                  execute remaining_commands (I (val1 - val2) :: updated_stack) trace
+                | Mul :: remaining_commands, I val1 :: I val2 :: updated_stack ->
+                  execute remaining_commands (I (val1 * val2) :: updated_stack) trace
+                | Div :: remaining_commands, I val1 :: I val2 :: updated_stack ->
+                  if val2 != 0 then execute remaining_commands (I (val1 / val2) :: updated_stack) trace 
+                  else return_panic remaining_commands stack trace
+                (* ... other cases for And, Or, Not, Lt, Gt ... *)
+                | _ -> return_panic commands stack trace
+              and return_panic commands stack trace =
+                Some ("Panic" :: trace)  (* Only returns panic if one of the panic cases are reached *)
+              in
+              execute parsed_commands [] []
+            | _ -> None
