@@ -204,21 +204,21 @@ let option (p : 'a parser) : 'a option parser =
       (ws >> keyword "Lt" >| Lt) <|>
       (ws >> keyword "Gt" >| Gt)
     
-      let rec prog ls =
-         match com ls with
-         | Some (c, ls') -> 
-           let ls'' = (match char ';' ls' with | Some (_, ls'') -> ls'' | None -> ls') in
-           (match prog ls'' with
-            | Some (cs, ls''') -> Some (c :: cs, ls''')
-            | None -> Some ([c], ls'))
-         | None -> None
+   let rec prog ls =
+      match com ls with
+      | Some (c, ls') -> 
+         let ls'' = (match char ';' ls' with | Some (_, ls'') -> ls'' | None -> ls') in
+         (match prog ls'' with
+         | Some (cs, ls''') -> Some (c :: cs, ls''')
+         | None -> Some ([c], ls'))
+      | None -> None
        
-       and prog_with_ws ls =
-         match prog ls with
-         | Some (cs, ls') ->
-           let ls'' = (match ws ls' with | Some (_, ls'') -> ls'' | None -> ls') in
-           Some (cs, ls'')
-         | None -> None
+      and prog_with_ws ls =
+      match prog ls with
+      | Some (cs, ls') ->
+         let ls'' = (match ws ls' with | Some (_, ls'') -> ls'' | None -> ls') in
+         Some (cs, ls'')
+      | None -> None
 
       let interp (s : string) : string list option =
          match parse (ws >> prog_with_ws) s with
