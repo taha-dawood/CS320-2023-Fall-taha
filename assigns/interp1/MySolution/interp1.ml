@@ -204,8 +204,21 @@ let option (p : 'a parser) : 'a option parser =
       (ws >> keyword "Lt" >| Lt) <|>
       (ws >> keyword "Gt" >| Gt)
 
-      let rec prog : char list -> (prog * char list) option
-      and prog_with_ws : char list -> (prog * char list) option
+      let rec prog ls = match com ls with
+         | Some (c, ls') -> 
+           (match char ';' ls' with
+            | Some (_, ls'') ->
+              (match prog ls'' with
+               | Some (cs, ls''') -> Some (c :: cs, ls''')
+               | None -> Some ([c], ls''))
+            | None -> Some ([c], ls'))
+         | None -> None
+       
+       and prog_with_ws ls = match prog ls with
+         | Some (cs, ls') -> (match ws ls' with
+                              | Some (_, ls'') -> Some (cs, ls'')
+                              | None -> Some (cs, ls'))
+         | None -> None
     
       let interp (s : string) : string list option =
          let rec exec_command command stack trace = match command, stack with
@@ -235,18 +248,4 @@ let option (p : 'a parser) : 'a option parser =
          | Some (p, []) -> exec_program p [] []
          | _ -> None
        
-       let rec prog ls = match com ls with
-         | Some (c, ls') -> 
-           (match char ';' ls' with
-            | Some (_, ls'') ->
-              (match prog ls'' with
-               | Some (cs, ls''') -> Some (c :: cs, ls''')
-               | None -> Some ([c], ls''))
-            | None -> Some ([c], ls'))
-         | None -> None
        
-       and prog_with_ws ls = match prog ls with
-         | Some (cs, ls') -> (match ws ls' with
-                              | Some (_, ls'') -> Some (cs, ls'')
-                              | None -> Some (cs, ls'))
-         | None -> None
