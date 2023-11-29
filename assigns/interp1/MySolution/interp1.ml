@@ -204,45 +204,46 @@ let option (p : 'a parser) : 'a option parser =
       (ws >> keyword "Lt" >| Lt) <|>
       (ws >> keyword "Gt" >| Gt)
     
-   let rec prog ls =
-      match com ls with
-      | Some (c, ls') -> 
-         let ls'' = (match char ';' ls' with | Some (_, ls'') -> ls'' | None -> ls') in
-         (match prog ls'' with
-         | Some (cs, ls''') -> Some (c :: cs, ls''')
-         | None -> Some ([c], ls'))
-      | None -> None
-       
-      and prog_with_ws ls =
-      match prog ls with
-      | Some (cs, ls') ->
-         let ls'' = (match ws ls' with | Some (_, ls'') -> ls'' | None -> ls') in
-         Some (cs, ls'')
-      | None -> None
-
       let interp (s : string) : string list option =
+         let rec exec_command command stack trace = match command, stack with
+           | Push c, _ -> Some (c :: stack, trace)
+           | Pop, _ :: s -> Some (s, trace)
+           | Trace, c :: s -> Some (U :: s, (toString c) :: trace)
+           | Add, I i1 :: I i2 :: s -> Some (I (i1 + i2) :: s, trace)
+           | Sub, I i1 :: I i2 :: s -> Some (I (i1 - i2) :: s, trace)
+           | Mul, I i1 :: I i2 :: s -> Some (I (i1 * i2) :: s, trace)
+           | Div, I i1 :: I i2 :: s -> if i2 != 0 then Some (I (i1 / i2) :: s, trace) else None
+           | And, B b1 :: B b2 :: s -> Some (B (b1 && b2) :: s, trace)
+           | Or, B b1 :: B b2 :: s -> Some (B (b1 || b2) :: s, trace)
+           | Not, B b :: s -> Some (B (not b) :: s, trace)
+           | Lt, I i1 :: I i2 :: s -> Some (B (i1 < i2) :: s, trace)
+           | Gt, I i1 :: I i2 :: s -> Some (B (i1 > i2) :: s, trace)
+           | _ -> None  (* Handle invalid cases *)
+       
+         and exec_program program stack trace = match program with
+           | [] -> Some trace  (* End of program *)
+           | command :: rest -> 
+             (match exec_command command stack trace with
+               | Some (new_stack, new_trace) -> exec_program rest new_stack new_trace
+               | None -> None)  (* Command failed *)
+       
+         in
          match parse (ws >> prog_with_ws) s with
-         | Some (p, []) ->
-           let rec exec p stack trace =
-             match p, stack with
-             | [], _ -> Some trace
-             | Push c :: p', _ -> exec p' (c :: stack) trace
-             | Pop :: p', _ :: stack' -> exec p' stack' trace
-             | Pop :: p', [] -> return_panic p' [] trace
-             | Trace :: p', c :: stack' -> exec p' (U :: stack') ((toString c) :: trace)
-             | Trace :: p', [] -> return_panic p' [] trace
-             | Add :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 + i2) :: stack') trace
-             | Sub :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 - i2) :: stack') trace
-             | Mul :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 * i2) :: stack') trace
-             | Div :: p, I i1 :: I i2 :: stack' ->
-               if i2 = 0 then return_panic p stack trace else exec p (I (i1 / i2) :: stack') trace
-             | And :: p, B b1 :: B b2 :: stack' -> exec p (B (b1 && b2) :: stack') trace
-             | Or :: p, B b1 :: B b2 :: stack' -> exec p (B (b1 || b2) :: stack') trace
-             | Not :: p, B b :: stack' -> exec p (B (not b) :: stack') trace
-             | Lt :: p, I i1 :: I i2 :: stack' -> exec p (B (i1 < i2) :: stack') trace
-             | Gt :: p, I i1 :: I i2 :: stack' -> exec p (B (i1 > i2) :: stack') trace
-             | _ -> return_panic p stack trace
-           and return_panic p stack trace = Some ("Panic" :: trace)
-           in
-           exec p [] []
+         | Some (p, []) -> exec_program p [] []
          | _ -> None
+       
+       let rec prog ls = match com ls with
+         | Some (c, ls') -> 
+           (match char ';' ls' with
+            | Some (_, ls'') ->
+              (match prog ls'' with
+               | Some (cs, ls''') -> Some (c :: cs, ls''')
+               | None -> Some ([c], ls''))
+            | None -> Some ([c], ls'))
+         | None -> None
+       
+       and prog_with_ws ls = match prog ls with
+         | Some (cs, ls') -> (match ws ls' with
+                              | Some (_, ls'') -> Some (cs, ls'')
+                              | None -> Some (cs, ls'))
+         | None -> None
