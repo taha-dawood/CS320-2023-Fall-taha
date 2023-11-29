@@ -237,7 +237,7 @@ let option (p : 'a parser) : 'a option parser =
            | _ -> None  (* Handle invalid cases *)
        
          and exec_program program stack trace = match program with
-           | [] -> Some trace  (* End of program *)
+           | [] -> Some (List.rev trace)  (* End of program *)
            | command :: rest -> 
              (match exec_command command stack trace with
                | Some (new_stack, new_trace) -> exec_program rest new_stack new_trace
