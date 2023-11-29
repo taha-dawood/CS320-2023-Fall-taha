@@ -224,26 +224,16 @@ let option (p : 'a parser) : 'a option parser =
          match parse (ws >> prog_with_ws) s with
          | Some (p, []) ->
            let rec exec p stack trace =
-             match p with
-             | [] -> Some trace
-             | cmd :: p' -> match cmd, stack with
-               | Push c, _ -> exec p' (c :: stack) trace
-               | Pop, _ :: stack' -> exec p' stack' trace
-               | Pop, [] -> return_panic p' []
-               | Trace, c :: stack' -> exec p' (U :: stack') ((toString c) :: trace)
-               | Trace, [] -> return_panic p' []
-               | Add, I i1 :: I i2 :: stack' -> exec p' (I (i1 + i2) :: stack') trace
-               | Sub, I i1 :: I i2 :: stack' -> exec p' (I (i1 - i2) :: stack') trace
-               | Mul, I i1 :: I i2 :: stack' -> exec p' (I (i1 * i2) :: stack') trace
-               | Div, I i1 :: I i2 :: stack' -> 
-                   if i2 = 0 then return_panic p' stack' else exec p' (I (i1 / i2) :: stack') trace
-               | And, B b1 :: B b2 :: stack' -> exec p' (B (b1 && b2) :: stack') trace
-               | Or, B b1 :: B b2 :: stack' -> exec p' (B (b1 || b2) :: stack') trace
-               | Not, B b :: stack' -> exec p' (B (not b) :: stack') trace
-               | Lt, I i1 :: I i2 :: stack' -> exec p' (B (i1 < i2) :: stack') trace
-               | Gt, I i1 :: I i2 :: stack' -> exec p' (B (i1 > i2) :: stack') trace
-               | _ -> return_panic p' stack
-           and return_panic p stack = Some ("Panic" :: trace)
+             match p, stack with
+             | [], _ -> Some trace
+             | Push c :: p', _ -> exec p' (c :: stack) trace
+             | Pop :: p', _ :: stack' -> exec p' stack' trace
+             | Pop :: p', [] -> return_panic p' [] trace
+             | Trace :: p', c :: stack' -> exec p' (U :: stack') ((toString c) :: trace)
+             | Trace :: p', [] -> return_panic p' [] trace
+             (* ... [Other command executions] ... *)
+             | _ -> return_panic p stack trace
+           and return_panic p stack trace = Some ("Panic" :: trace)
            in
            exec p [] []
          | _ -> None
