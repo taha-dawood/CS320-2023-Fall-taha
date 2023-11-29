@@ -231,7 +231,16 @@ let option (p : 'a parser) : 'a option parser =
              | Pop :: p', [] -> return_panic p' [] trace
              | Trace :: p', c :: stack' -> exec p' (U :: stack') ((toString c) :: trace)
              | Trace :: p', [] -> return_panic p' [] trace
-             (* ... [Other command executions] ... *)
+             | Add :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 + i2) :: stack') trace
+             | Sub :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 - i2) :: stack') trace
+             | Mul :: p, I i1 :: I i2 :: stack' -> exec p (I (i1 * i2) :: stack') trace
+             | Div :: p, I i1 :: I i2 :: stack' ->
+               if i2 = 0 then return_panic p stack trace else exec p (I (i1 / i2) :: stack') trace
+             | And :: p, B b1 :: B b2 :: stack' -> exec p (B (b1 && b2) :: stack') trace
+             | Or :: p, B b1 :: B b2 :: stack' -> exec p (B (b1 || b2) :: stack') trace
+             | Not :: p, B b :: stack' -> exec p (B (not b) :: stack') trace
+             | Lt :: p, I i1 :: I i2 :: stack' -> exec p (B (i1 < i2) :: stack') trace
+             | Gt :: p, I i1 :: I i2 :: stack' -> exec p (B (i1 > i2) :: stack') trace
              | _ -> return_panic p stack trace
            and return_panic p stack trace = Some ("Panic" :: trace)
            in
