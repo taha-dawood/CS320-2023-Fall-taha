@@ -203,6 +203,9 @@ let option (p : 'a parser) : 'a option parser =
       (ws >> keyword "Not" >| Not) <|>
       (ws >> keyword "Lt" >| Lt) <|>
       (ws >> keyword "Gt" >| Gt)
+
+      let rec prog : char list -> (prog * char list) option
+      and prog_with_ws : char list -> (prog * char list) option
     
       let interp (s : string) : string list option =
          let rec exec_command command stack trace = match command, stack with
