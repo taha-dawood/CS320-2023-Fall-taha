@@ -250,7 +250,22 @@ let option (p : 'a parser) : 'a option parser =
                 | Div :: remaining_commands, I val1 :: I val2 :: updated_stack ->
                   if val2 != 0 then execute remaining_commands (I (val1 / val2) :: updated_stack) trace 
                   else return_panic remaining_commands stack trace
-                (* ... other cases for And, Or, Not, Lt, Gt ... *)
+                | Div :: p, _ -> return_panic p stack trace
+  
+                | And :: p, B b1 :: B b2 :: stack -> exec p (B (b1 && b2) :: stack) trace
+                | And :: p, _ -> return_panic p stack trace
+        
+                | Or :: p, B b1 :: B b2 :: stack -> exec p (B (b1 || b2) :: stack) trace
+                | Or :: p, _ -> return_panic p stack trace
+        
+                | Not :: p, B b :: stack -> exec p (B (not b) :: stack) trace
+                | Not :: p, _ -> return_panic p stack trace
+        
+                | Lt :: p, I i1 :: I i2 :: stack -> exec p (B (i1 < i2) :: stack) trace
+                | Lt :: p, _ -> return_panic p stack trace
+                  
+                | Gt :: p, I i1 :: I i2 :: stack -> exec p (B (i1 > i2) :: stack) trace
+                | Gt :: p, _ -> return_panic p stack trace)
                 | _ -> return_panic commands stack trace
               and return_panic commands stack trace =
                 Some ("Panic" :: trace)  (* Only returns panic if one of the panic cases are reached *)
