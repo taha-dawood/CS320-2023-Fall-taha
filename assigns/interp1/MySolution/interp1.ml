@@ -216,69 +216,64 @@ let option (p : 'a parser) : 'a option parser =
              | None -> Some ([c], ls'))
           | None -> None      
     **)
-    let rec prog ls =
-      match com ls with
-      | Some (c, ls') ->
-        (match char ';' ls' with
-         | Some (_, ls'') ->
-           (match prog ls'' with
-            | Some (cs, ls''') -> Some (c :: cs, ls''')
-            | None -> Some ([c], ls''))
-         | None -> Some ([c], ls'))
+    let rec parse_sequence char_list =
+      match com char_list with
+      | Some (command, remaining_chars) ->
+        (match char ';' remaining_chars with
+         | Some (_, chars_after_semicolon) ->
+           (match parse_sequence chars_after_semicolon with
+            | Some (commands, remaining_chars_final) -> Some (command :: commands, remaining_chars_final)
+            | None -> Some ([command], remaining_chars))
+         | None -> Some ([command], remaining_chars))
+      | None -> None
+        
+    and parse_sequence_with_whitespace char_list =
+      match parse_sequence char_list with
+      | Some (commands, remaining_chars) ->
+        (match ws remaining_chars with
+         | Some (_, chars_after_whitespace) -> Some (commands, chars_after_whitespace)
+         | None -> Some (commands, remaining_chars))
       | None -> None
     
-    and prog_with_ws ls =
-      match prog ls with
-      | Some (cs, ls') ->
-        (match ws ls' with
-         | Some (_, ls'') -> Some (cs, ls'')
-         | None -> Some (cs, ls'))
-      | None -> None
-    
-    
-    
-      let interp (s : string) : string list option =
-        match parse (ws >> prog_with_ws) s with
-        | Some (p, []) ->
-          let rec exec p stack trace =
-            match p, stack with
-            | [], _ -> Some ( trace)
-            | Push c :: p, stack -> exec p (c :: stack) trace
-            | Pop :: p, _ :: stack -> exec p stack trace
-            | Pop :: p, [] -> return_panic p [] trace
-            | Trace :: p, c :: stack ->
-              let updated_trace = (toString c) :: trace in
-              let updated_stack = U :: stack in
-              exec p updated_stack updated_trace
-            | Trace :: p, [] -> return_panic p [] trace
-  
-            | Add :: p, I i1 :: I i2 :: stack -> exec p (I (i1 + i2) :: stack) trace
-            | Add :: p, _ -> return_panic p stack trace
-  
-            | Sub :: p, I i1 :: I i2 :: stack -> exec p (I (i1 - i2) :: stack) trace
-            | Sub :: p, _ -> return_panic p stack trace
-  
-            | Mul :: p, I i1 :: I i2 :: stack -> exec p (I (i1 * i2) :: stack) trace
-            | Mul :: p, _ -> return_panic p stack trace
-  
-            | Div :: p, I i1 :: I i2 :: stack -> if i2 = 0 then return_panic p stack trace else exec p (I (i1 / i2) :: stack) trace
-            | Div :: p, _ -> return_panic p stack trace
-  
-            | And :: p, B b1 :: B b2 :: stack -> exec p (B (b1 && b2) :: stack) trace
-            | And :: p, _ -> return_panic p stack trace
-  
-            | Or :: p, B b1 :: B b2 :: stack -> exec p (B (b1 || b2) :: stack) trace
-            | Or :: p, _ -> return_panic p stack trace
-  
-            | Not :: p, B b :: stack -> exec p (B (not b) :: stack) trace
-            | Not :: p, _ -> return_panic p stack trace
-  
-            | Lt :: p, I i1 :: I i2 :: stack -> exec p (B (i1 < i2) :: stack) trace
-            | Lt :: p, _ -> return_panic p stack trace
-            
-            | Gt :: p, I i1 :: I i2 :: stack -> exec p (B (i1 > i2) :: stack) trace
-            | Gt :: p, _ -> return_panic p stack trace
-          and return_panic p stack trace = Some ( ("Panic" :: trace)) (**Only returns panic if one of the panic cases are reached, None or Some otherwise*)
-          in
-          exec p [] []
-        | _ -> None
+    (* Updated interp function with new variable names *)
+    let interp (program_string : string) : string list option =
+      match parse (ws >> parse_sequence_with_whitespace) program_string with
+      | Some (parsed_program, remaining_chars) ->
+        let rec execute_program program_commands execution_stack trace_history =
+          match program_commands, execution_stack with
+          | [], _ -> Some trace_history
+          | Push const_value :: rest_commands, stack ->
+            execute_program rest_commands (const_value :: stack) trace_history
+          | Pop :: rest_commands, _ :: updated_stack ->
+            execute_program rest_commands updated_stack trace_history
+          | Pop :: rest_commands, [] ->
+            Some ("Panic" :: trace_history)
+          | Trace :: rest_commands, top_const :: updated_stack ->
+            let new_trace = (toString top_const) :: trace_history in
+            execute_program rest_commands (U :: updated_stack) new_trace
+          | Trace :: rest_commands, [] ->
+            Some ("Panic" :: trace_history)
+          | Add :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            execute_program rest_commands (I (val1 + val2) :: updated_stack) trace_history
+          | Sub :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            execute_program rest_commands (I (val1 - val2) :: updated_stack) trace_history
+          | Mul :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            execute_program rest_commands (I (val1 * val2) :: updated_stack) trace_history
+          | Div :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            if val2 != 0 
+            then execute_program rest_commands (I (val1 / val2) :: updated_stack) trace_history
+            else Some ("Panic" :: trace_history)
+          | And :: rest_commands, B bool1 :: B bool2 :: updated_stack ->
+            execute_program rest_commands (B (bool1 && bool2) :: updated_stack) trace_history
+          | Or :: rest_commands, B bool1 :: B bool2 :: updated_stack ->
+            execute_program rest_commands (B (bool1 || bool2) :: updated_stack) trace_history
+          | Not :: rest_commands, B bool_val :: updated_stack ->
+            execute_program rest_commands (B (not bool_val) :: updated_stack) trace_history
+          | Lt :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            execute_program rest_commands (B (val1 < val2) :: updated_stack) trace_history
+          | Gt :: rest_commands, I val1 :: I val2 :: updated_stack ->
+            execute_program rest_commands (B (val1 > val2) :: updated_stack) trace_history
+          | _ -> Some ("Panic" :: trace_history)
+        in
+        execute_program parsed_program [] []
+      | _ -> None
