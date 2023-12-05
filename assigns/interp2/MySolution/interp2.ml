@@ -86,7 +86,7 @@ let rec parse_com ()=
   parse_ifelse() <|>
   parse_fun()
 and parse_coms ()= many' (fun x -> parse_com x << keyword ";")
-and parse_ifelse ()=| _ :: a :: s0 -> evaluate [] ("Panic" :: t) e []
+and parse_ifelse ()=
   keyword "If" >> parse_coms () >>= fun c1 ->
   keyword "Else" >> parse_coms () >>= fun c2 -> 
   keyword "End" >>
