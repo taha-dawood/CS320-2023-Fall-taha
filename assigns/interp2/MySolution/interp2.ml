@@ -86,7 +86,7 @@ let rec parse_com ()=
   parse_ifelse() <|>
   parse_fun()
 and parse_coms ()= many' (fun x -> parse_com x << keyword ";")
-and parse_ifelse ()=| _ :: a :: s0 -> eval [] ("Panic" :: t) e []
+and parse_ifelse ()=| _ :: a :: s0 -> evaluate [] ("Panic" :: t) e []
   keyword "If" >> parse_coms () >>= fun c1 ->
   keyword "Else" >> parse_coms () >>= fun c2 -> 
   keyword "End" >>
@@ -121,113 +121,113 @@ let toString (c : const) : string =
  | Sym s -> s
  | Closure (name, env, coms) -> string_append (string_append ("Fun<") (name) ) ">"
 
-let rec eval (s : stack) (t : trace) (e: env) (p : prog) : trace =
- match p with
- | [] -> t
- | Push c :: p0  -> eval (c :: s) t e p0
- | Pop :: p0 ->
-   (match s with
-    | _ :: s0  -> eval s0 t e p0
-    | []       -> eval [] ("Panic" :: t) e [])
- | Trace :: p0 ->
-   (match s with
-    | c :: s0  -> eval (Unit :: s0) (toString c :: t) e p0
-    | []       -> eval [] ("Panic" :: t) e [])
- | Add :: p0 ->
-   (match s with
-    | Int i :: Int j :: s0   -> eval (Int (i + j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | Sub :: p0 ->
-   (match s with
-    | Int i :: Int j :: s0   -> eval (Int (i - j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | Mul :: p0 ->
-   (match s with
-    | Int i :: Int j :: s0   -> eval (Int (i * j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | Div :: p0 ->
-   (match s with
-    | Int i :: Int 0 :: s0  -> eval [] ("Panic" :: t) e []
-    | Int i :: Int j :: s0   -> eval (Int (i / j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | And :: p0 ->
-   (match s with
-    | Bool a :: Bool b :: s0   -> eval (Bool (a && b) :: s0) t e p0
-    | _ :: _ :: s0            -> eval [] ("Panic" :: t) e []
-    | []                      -> eval [] ("Panic" :: t) e []
-    | _ :: []                 -> eval [] ("Panic" :: t) e [])
- | Or :: p0 ->
-   (match s with
-    | Bool a :: Bool b :: s0   -> eval (Bool (a || b) :: s0) t e p0
-    | _ :: _ :: s0            -> eval [] ("Panic" :: t) e []
-    | []                      -> eval [] ("Panic" :: t) e []
-    | _ :: []                 -> eval [] ("Panic" :: t) e [])
- | Not :: p0 ->
-   (match s with
-    | Bool a :: s0  -> eval (Bool (not a) :: s0) t e p0
-    | _ :: s0       -> eval [] ("Panic" :: t) e []
-    | []            -> eval [] ("Panic" :: t) e [])
- | Lt :: p0 ->
-   (match s with
-    | Int i :: Int j :: s0   -> eval (Bool (i < j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | Gt :: p0 ->
-   (match s with
-    | Int i :: Int j :: s0   -> eval (Bool (i > j) :: s0) t e p0
-    | _ :: _ :: s0          -> eval [] ("Panic" :: t) e []
-    | []                    -> eval [] ("Panic" :: t) e []
-    | _ :: []               -> eval [] ("Panic" :: t) e [])
- | Swap :: p0 ->
-   (match s with
-    | x :: y :: lst -> eval  (y :: x :: lst) t e p0
-    | []  -> eval [] ("Panic" :: t) e []
-    | x :: []  -> eval [] ("Panic" :: t) e [])
- | Bind :: p0 -> 
-   (match s with
-    | Sym x :: v :: s0 -> eval s0 t ((x, v) :: e) p0
-    | _ -> eval [] ("Panic" :: t) e [])
- | Lookup :: p0 -> 
-   (match s with
-    | Sym x :: s0 -> 
-     let rec find env (key) =
-        match env with
-        | [] -> None
-        | (k, v) :: rest -> if k = key then Some v else find rest key
-     in
-     (match find e x with
-        | Some v -> eval (v :: s0) t e p0
-        | None -> eval [] ("Panic" :: t) e [])
-    | _ -> eval [] ("Panic" :: t) e [])
- | If (c1, c2) :: p0 -> 
-   (match s with
-    | Bool b :: s0 ->  if b then eval s0 t e (append_lists c1 p0) else eval s0 t e (append_lists c2 p0)
-    | _ -> eval [] ("Panic" :: t) e [])
- | Fun c1 :: p0 ->
-   (match s with
-    | Sym x :: s0 -> eval (Closure(x, e, c1) :: s0) t e p0
-    | _ -> eval [] ("Panic" :: t) e [])
- | Call :: p0 ->
-   (match s with
-    | Closure (f, v, c) :: a :: s0 -> eval (a :: Closure(string_append (string_append "cc_foo(" (toString(a))) ")",e,p0) :: s0) t ((f,Closure(f,v,c)) :: v) c
-    | _ -> eval [] ("Panic" :: t) e [])
- | Return :: p0 ->
-   (match s with
-    | Closure (f, v, c) :: a :: s0 -> eval (a :: s0) t v c
-    | _ -> eval [] ("Panic" :: t) e [])
+ let rec evaluate (stack : stack) (trace : trace) (environment: env) (program : prog) : trace =
+  match program with
+  | [] -> trace
+  | Push constant :: rest_program  -> evaluate (constant :: stack) trace environment rest_program
+  | Pop :: rest_program ->
+    (match stack with
+     | _ :: stack_tail  -> evaluate stack_tail trace environment rest_program
+     | []               -> evaluate [] ("Panic" :: trace) environment [])
+  | Trace :: rest_program ->
+    (match stack with
+     | constant :: stack_tail  -> evaluate (Unit :: stack_tail) (toString constant :: trace) environment rest_program
+     | []                      -> evaluate [] ("Panic" :: trace) environment [])
+  | Add :: rest_program ->
+    (match stack with
+     | Int first :: Int second :: stack_tail -> evaluate (Int (first + second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | Sub :: rest_program ->
+    (match stack with
+     | Int first :: Int second :: stack_tail -> evaluate (Int (first - second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | Mul :: rest_program ->
+    (match stack with
+     | Int first :: Int second :: stack_tail -> evaluate (Int (first * second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | Div :: rest_program ->
+    (match stack with
+     | Int first :: Int 0 :: stack_tail      -> evaluate [] ("Panic" :: trace) environment []
+     | Int first :: Int second :: stack_tail -> evaluate (Int (first / second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | And :: rest_program ->
+    (match stack with
+     | Bool first_bool :: Bool second_bool :: stack_tail -> evaluate (Bool (first_bool && second_bool) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                              -> evaluate [] ("Panic" :: trace) environment []
+     | []                                                -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                                           -> evaluate [] ("Panic" :: trace) environment [])
+  | Or :: rest_program ->
+    (match stack with
+     | Bool first_bool :: Bool second_bool :: stack_tail -> evaluate (Bool (first_bool || second_bool) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                              -> evaluate [] ("Panic" :: trace) environment []
+     | []                                                -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                                           -> evaluate [] ("Panic" :: trace) environment [])
+  | Not :: rest_program ->
+    (match stack with
+     | Bool boolean :: stack_tail -> evaluate (Bool (not boolean) :: stack_tail) trace environment rest_program
+     | _ :: stack_tail            -> evaluate [] ("Panic" :: trace) environment []
+     | []                         -> evaluate [] ("Panic" :: trace) environment [])
+  | Lt :: rest_program ->
+    (match stack with
+     | Int first :: Int second :: stack_tail -> evaluate (Bool (first < second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | Gt :: rest_program ->
+    (match stack with
+     | Int first :: Int second :: stack_tail -> evaluate (Bool (first > second) :: stack_tail) trace environment rest_program
+     | _ :: _ :: stack_tail                  -> evaluate [] ("Panic" :: trace) environment []
+     | []                                    -> evaluate [] ("Panic" :: trace) environment []
+     | _ :: []                               -> evaluate [] ("Panic" :: trace) environment [])
+  | Swap :: rest_program ->
+    (match stack with
+     | first :: second :: stack_list -> evaluate (second :: first :: stack_list) trace environment rest_program
+     | []                            -> evaluate [] ("Panic" :: trace) environment []
+     | first :: []                   -> evaluate [] ("Panic" :: trace) environment [])
+  | Bind :: rest_program -> 
+    (match stack with
+     | Sym symbol :: value :: stack_tail -> evaluate stack_tail trace ((symbol, value) :: environment) rest_program
+     | _                                 -> evaluate [] ("Panic" :: trace) environment [])
+  | Lookup :: rest_program -> 
+    (match stack with
+     | Sym symbol :: stack_tail -> 
+       let rec find env key =
+          match env with
+          | [] -> None
+          | (key, value) :: rest -> if key = symbol then Some value else find rest symbol
+       in
+       (match find environment symbol with
+          | Some value -> evaluate (value :: stack_tail) trace environment rest_program
+          | None -> evaluate [] ("Panic" :: trace) environment [])
+      | _ -> evaluate [] ("Panic" :: trace) environment [])
+  | If (condition1, condition2) :: rest_program -> 
+    (match stack with
+     | Bool condition :: stack_tail -> if condition then evaluate stack_tail trace environment (append_lists condition1 rest_program) else evaluate stack_tail trace environment (append_lists condition2 rest_program)
+     | _                            -> evaluate [] ("Panic" :: trace) environment [])
+  | Fun condition1 :: rest_program ->
+    (match stack with
+     | Sym symbol :: stack_tail -> evaluate (Closure(symbol, environment, condition1) :: stack_tail) trace environment rest_program
+     | _                        -> evaluate [] ("Panic" :: trace) environment [])
+  | Call :: rest_program ->
+    (match stack with
+     | Closure (function_name, var, code) :: argument :: stack_tail -> evaluate (argument :: Closure(toString(argument),environment,rest_program) :: stack_tail) trace ((function_name,Closure(function_name,var,code)) :: var) code
+     | _                                                             -> evaluate [] ("Panic" :: trace) environment [])
+  | Return :: rest_program ->
+    (match stack with
+     | Closure (function_name, var, code) :: argument :: stack_tail -> evaluate (argument :: stack_tail) trace var code
+     | _                                                            -> evaluate [] ("Panic" :: trace) environment [])
 
 let interp (s : string) : string list option =
  match string_parse (whitespaces >> parse_coms ()) s with
- | Some (p, []) -> Some (eval [] [] [] p)
+ | Some (p, []) -> Some (evaluate [] [] [] p)
  | _ -> None
 
 let read_file (fname : string) : string =
