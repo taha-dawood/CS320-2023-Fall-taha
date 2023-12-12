@@ -319,65 +319,65 @@ let scope_expr (m : expr) : expr =
   in
   aux [] m
 
-(* ------------------------------------------------------------ *)
 
-(* parser for the high-level language *)
-(* String concatenation function *)
-let concatenate_strings (str1: string) (str2: string): string =
-  let len1 = String.length str1 in
-  let len2 = String.length str2 in
-  let total_len = len1 + len2 in
-  String.init total_len (fun i ->
-    if i < len1 then str1.[i]
-    else str2.[i - len1]
-  )
 
-let parse_and_scope_program (s: string): expr =
-  match string_parse (whitespaces >> parse_expr ()) s with
-  | Some (expr, []) -> scope_expr expr
-  | _ -> raise SyntaxError
-let rec compile_expr (expr: expr): string =
-  let concat = concatenate_strings in
-  let bin_op op x y =
-    match op with
-    | Add -> concat (concat (compile_expr x) (compile_expr y)) "Add; "
-    | Sub -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Sub; "
-    | Mul -> concat (concat (compile_expr x) (compile_expr y)) "Mul; "
-    | Div -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Div; "
-    | Mod ->
-      concat
-        (concat (compile_expr (BOpr (Div, x, y))) (compile_expr y))
-        (concat "Mul; " (concat (compile_expr x) "Sub; "))
-    | And -> concat (concat (compile_expr x) (compile_expr y)) "And; "
-    | Or -> concat (concat (compile_expr x) (compile_expr y)) "Or; "
-    | Lt -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Lt; "
-    | Gt -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Gt; "
-    | Lte -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Gt; Not; "
-    | Gte -> concat (concat (compile_expr x) (compile_expr y)) "Swap; Lt; Not; "
-    | Eq ->
-      concat
-        (concat (compile_expr x) (compile_expr y))
-        (concat "Swap; Gt; Not; " (concat (compile_expr x) (concat (compile_expr y) "Swap; Lt; Not; And; ")))
-  in
-  match expr with
-  | Int x -> concat "Push " (concat (string_of_int x) "; ")
-  | Bool x -> if x then "Push True; " else "Push False; "
-  | Var x -> concat "Push " (concat x "; Lookup; ")
-  | Unit -> "Push Unit; "
-  | UOpr (op, x) -> concat (compile_expr x) (match op with Neg -> "Push -1; Mul; " | Not -> "Not; ")
-  | BOpr (op, x, y) -> bin_op op x y
-  | Let (var, expr, body) -> concat (concat (compile_expr expr) (concat "Push " (concat var "; Bind; "))) (compile_expr body)
-  | Fun (func_name, param_name, body) ->
-    concat
-      (concat (concat "Push " (concat func_name "; Fun ")) (concat "Push " (concat param_name "; Bind; ")))
-      (concat (compile_expr body) "Swap; Return; End; ")
-  | App (func, param) -> concat (concat (compile_expr func) (compile_expr param)) "Swap; Call; "
-  | Seq (expr1, expr2) -> concat (concat (compile_expr expr1) "Pop; ") (compile_expr expr2)
-  | Ifte (cond_expr, true_expr, false_expr) ->
-    concat
-      (concat (compile_expr cond_expr) (concat "If " (compile_expr true_expr)))
-      (concat "Else " (concat (compile_expr false_expr) "End; "))
-  | Trace expr -> concat (compile_expr expr) "Trace; "
-
-let compile (s: string): string =
-  compile_expr (parse_and_scope_program s)
+  let concatenate (first: string) (second: string): string =
+    let first_len = String.length first in
+    let second_len = String.length second in
+    let combined_len = first_len + second_len in
+    String.init combined_len (fun index ->
+      if index < first_len then first.[index]
+      else second.[index - first_len]
+    )
+  
+  let parse_and_scope (source_code: string): expr =
+    match string_parse (whitespaces >> parse_expr ()) source_code with
+    | Some (parsed_expr, []) -> scope_expr parsed_expr
+    | _ -> raise SyntaxError
+  
+  let rec compile_expression (expression: expr): string =
+    let combine = concatenate in
+    let compile_binary_operator operator left right =
+      match operator with
+      | Add -> combine (combine (compile_expression left) (compile_expression right)) "Add; "
+      | Sub -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Sub; "
+      | Mul -> combine (combine (compile_expression left) (compile_expression right)) "Mul; "
+      | Div -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Div; "
+      | Mod ->
+        combine
+          (combine (compile_expression (BOpr (Div, left, right))) (compile_expression right))
+          (combine "Mul; " (combine (compile_expression left) "Sub; "))
+      | And -> combine (combine (compile_expression left) (compile_expression right)) "And; "
+      | Or -> combine (combine (compile_expression left) (compile_expression right)) "Or; "
+      | Lt -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Lt; "
+      | Gt -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Gt; "
+      | Lte -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Gt; Not; "
+      | Gte -> combine (combine (compile_expression left) (compile_expression right)) "Swap; Lt; Not; "
+      | Eq ->
+        combine
+          (combine (compile_expression left) (compile_expression right))
+          (combine "Swap; Gt; Not; " (combine (compile_expression left) (combine (compile_expression right) "Swap; Lt; Not; And; ")))
+    in
+    match expression with
+    | Int num -> combine "Push " (combine (string_of_int num) "; ")
+    | Bool flag -> if flag then "Push True; " else "Push False; "
+    | Var variable -> combine "Push " (combine variable "; Lookup; ")
+    | Unit -> "Push Unit; "
+    | UOpr (unary_op, expr) -> combine (compile_expression expr) (match unary_op with Neg -> "Push -1; Mul; " | Not -> "Not; ")
+    | BOpr (binary_op, left, right) -> compile_binary_operator binary_op left right
+    | Let (binding_var, bound_expr, body_expr) -> combine (combine (compile_expression bound_expr) (combine "Push " (combine binding_var "; Bind; "))) (compile_expression body_expr)
+    | Fun (func_name, param, func_body) ->
+      combine
+        (combine (combine "Push " (combine func_name "; Fun ")) (combine "Push " (combine param "; Bind; ")))
+        (combine (compile_expression func_body) "Swap; Return; End; ")
+    | App (function_expr, argument) -> combine (combine (compile_expression function_expr) (compile_expression argument)) "Swap; Call; "
+    | Seq (first_expr, second_expr) -> combine (combine (compile_expression first_expr) "Pop; ") (compile_expression second_expr)
+    | Ifte (condition, true_branch, false_branch) ->
+      combine
+        (combine (compile_expression condition) (combine "If " (compile_expression true_branch)))
+        (combine "Else " (combine (compile_expression false_branch) "End; "))
+    | Trace traced_expr -> combine (compile_expression traced_expr) "Trace; "
+  
+  let compile (program: string): string =
+    compile_expression (parse_and_scope program)
+  
