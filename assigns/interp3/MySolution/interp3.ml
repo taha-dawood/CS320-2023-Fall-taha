@@ -323,43 +323,57 @@ let scope_expr (m : expr) : expr =
 
 (* parser for the high-level language *)
 
+let concat_strings (s1: string) (s2: string): string =
+  s1 ^ s2
+
 let parse_prog (s : string) : expr =
   match string_parse (whitespaces >> parse_expr ()) s with
   | Some (m, []) -> scope_expr m
   | _ -> raise SyntaxError
 
-let concat (s1: string) (s2: string): string = s1 ^ s2
-
-let rec compile_expr = function
-  | Int x -> concat "Push " (concat (string_of_int x) "; ")
-  | Bool x -> if x then "Push True; " else "Push False; "
-  | Var x -> concat "Push " (concat x "; Lookup; ")
+let rec compile_int x = concat_strings "Push " (concat_strings (string_of_int x) "; ")
+and cbool x = if x then "Push True; " else "Push False; "
+and cvar x = concat_strings "Push " (concat_strings x "; Lookup; ")
+and cuopr op x = 
+  let op_str = match op with
+    | Neg -> "Push -1; Mul; "
+    | Not -> "Not; "
+  in concat_strings (cexpr x) op_str
+and compile_bopr op x y = 
+  let op_str = match op with
+    | Add -> "Add; "
+    | Sub -> "Sub; "
+    | Mul -> "Mul; "
+    | Div -> "Div; "
+    | Mod -> "Mod; "
+    | And -> "And; "
+    | Or  -> "Or; "
+    | Lt  -> "Lt; "
+    | Gt  -> "Gt; "
+    | Lte -> "Lte; "
+    | Gte -> "Gte; "
+    | Eq  -> "Eq; "
+  in concat_strings (concat_strings (cexpr x) (cexpr y)) op_str
+and clet v x y = concat_strings (concat_strings (cexpr x) (concat_strings "Push " (concat_strings v "; Bind; "))) (cexpr y)
+and cfun f v x = concat_strings (concat_strings "Push " (concat_strings f "; Fun ")) (concat_strings "Push " (concat_strings v "; Bind; ")) (concat_strings (cexpr x) "Return; End; ")
+and capp f v = concat_strings (concat_strings (cexpr f) (cexpr v)) "Call; "
+and cseq x y = concat_strings (concat_strings (cexpr x) "Pop; ") (cexpr y)
+and cifte x y z = concat_strings (concat_strings (cexpr x) (concat_strings "If " (cexpr y))) (concat_strings "Else " (cexpr z) "End; ")
+and ctrace x = concat_strings (cexpr x) "Trace; "
+and cexpr e = match e with
+  | Int x -> compile_int x
+  | Bool x -> cbool x
+  | Var x -> cvar x
   | Unit -> "Push Unit; "
-  | UOpr (Neg, m) -> concat (compile_expr m) "Push -1; Mul; "
-  | UOpr (Not, m) -> concat (compile_expr m) "Not; "
-  | BOpr (opr, m, n) ->
-      let opr_str = match opr with
-        | Add -> "Add"
-        | Sub -> "Sub"
-        | Mul -> "Mul"
-        | Div -> "Div"
-        | Mod -> "Mod"
-        | And -> "And"
-        | Or -> "Or"
-        | Lt -> "Lt"
-        | Gt -> "Gt"
-        | Lte -> "Lte"
-        | Gte -> "Gte"
-        | Eq -> "Eq"
-      in concat (concat (compile_expr m) (compile_expr n)) (opr_str ^ "; ")
-  | Let (v, x, y) ->
-      concat (concat (compile_expr x) (concat "Push " (concat v "; Bind; ")))(compile_expr y)
-  | Fun (f, v, x) ->
-      concat (concat (concat "Push " (concat f "; Fun ")) (concat "Push " (concat v "; Bind; "))) (concat (compile_expr x) "Swap; Return; End; ")
-  | App (f, v) -> concat (concat (compile_expr f) (compile_expr v)) "Swap; Call; "
-  | Seq (x, y) -> concat (concat (compile_expr x) "Pop; ") (compile_expr y)
-  | Ifte (x, y, z) -> concat (concat (compile_expr x) (concat "If " (compile_expr y))) (concat "Else " (concat (compile_expr z) "End; "))
-  | Trace x -> concat (compile_expr x) "Trace; "
+  | UOpr (op, x) -> cuopr op x
+  | BOpr (op, x, y) -> compile_bopr op x y
+  | Let (v, x, y) -> clet v x y
+  | Fun (f, v, x) -> cfun f v x
+  | App (f, v) -> capp f v
+  | Seq (x, y) -> cseq x y
+  | Ifte (x, y, z) -> cifte x y z
+  | Trace x -> ctrace x
   | _ -> "error; "
-      
-  let compile (s : string) : string = compile_expr  (parse_prog(s))
+
+let compile (s: string) : string =
+  cexpr (parse_prog(s))
