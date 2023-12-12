@@ -328,4 +328,38 @@ let parse_prog (s : string) : expr =
   | Some (m, []) -> scope_expr m
   | _ -> raise SyntaxError
 
-let compile (s : string) : string = (* YOUR CODE *)
+let concat (s1: string) (s2: string): string = s1 ^ s2
+
+let rec compile_expr = function
+  | Int x -> concat "Push " (concat (string_of_int x) "; ")
+  | Bool x -> if x then "Push True; " else "Push False; "
+  | Var x -> concat "Push " (concat x "; Lookup; ")
+  | Unit -> "Push Unit; "
+  | UOpr (Neg, m) -> concat (compile_expr m) "Push -1; Mul; "
+  | UOpr (Not, m) -> concat (compile_expr m) "Not; "
+  | BOpr (opr, m, n) ->
+      let opr_str = match opr with
+        | Add -> "Add"
+        | Sub -> "Sub"
+        | Mul -> "Mul"
+        | Div -> "Div"
+        | Mod -> "Mod"
+        | And -> "And"
+        | Or -> "Or"
+        | Lt -> "Lt"
+        | Gt -> "Gt"
+        | Lte -> "Lte"
+        | Gte -> "Gte"
+        | Eq -> "Eq"
+      in concat (concat (compile_expr m) (compile_expr n)) (opr_str ^ "; ")
+  | Let (v, x, y) ->
+      concat (concat (compile_expr x) (concat "Push " (concat v "; Bind; ")))(compile_expr y)
+  | Fun (f, v, x) ->
+      concat (concat (concat "Push " (concat f "; Fun ")) (concat "Push " (concat v "; Bind; "))) (concat (compile_expr x) "Swap; Return; End; ")
+  | App (f, v) -> concat (concat (compile_expr f) (compile_expr v)) "Swap; Call; "
+  | Seq (x, y) -> concat (concat (compile_expr x) "Pop; ") (compile_expr y)
+  | Ifte (x, y, z) -> concat (concat (compile_expr x) (concat "If " (compile_expr y))) (concat "Else " (concat (compile_expr z) "End; "))
+  | Trace x -> concat (compile_expr x) "Trace; "
+  | _ -> "error; "
+      
+  let compile (s : string) : string = compile_expr  (parse_prog(s))
